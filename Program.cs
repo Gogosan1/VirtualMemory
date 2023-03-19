@@ -1,7 +1,5 @@
 ﻿using VirtualMem;
 
-Console.WriteLine($"Длина массива {VmStorage.DefaultSize} элементов, Название файла '{VmStorage.DefaultFilename}'");
-
 ConsoleKeyInfo keyInfo;
 do
 {
@@ -11,15 +9,41 @@ do
 while (keyInfo.KeyChar != 'y' && keyInfo.KeyChar != 'n');
 Console.WriteLine();
 
-int storageSize = VmStorage.DefaultSize;
-String filename = VmStorage.DefaultFilename;
+VmStorage<int> storage;
+
+
 if (keyInfo.KeyChar == 'n')
 {
+    int storageSize, numberOfPages, sizeOfPage;
+    String filename;
     do
     {
-        long? value = ConsoleHelper.ReadLong("Введите новую длину массива (>=10000) (Enter - использовать значение по умолчанию): ", VmStorage.DefaultSize);
-        storageSize = (int)(value ?? 0);
-        if (storageSize >= 10000) break;
+        Console.Write("Введите новую длину массива (>=10000): ");
+        string? s = Console.ReadLine();
+        int val;
+        if (!String.IsNullOrEmpty(s) && Int32.TryParse(s, out val))
+        {
+            if (val >= 10000)
+            {
+                storageSize = val;
+                break;
+            }
+        }
+ 
+        Console.WriteLine("Введенное значение не удовлетворяет условиям");
+    }
+    while (true);
+
+    do
+    {
+
+        Console.Write("Введите новое имя файла: ");
+        string? s = Console.ReadLine();
+        if (!String.IsNullOrEmpty(s))
+        {
+            filename = s;
+            break;
+        }
 
         Console.WriteLine("Введенное значение не удовлетворяет условиям");
     }
@@ -27,28 +51,53 @@ if (keyInfo.KeyChar == 'n')
 
     do
     {
-        filename = ConsoleHelper.ReadString("Введите новое имя файла (Enter - использовать значение по умолчанию): ", VmStorage.DefaultFilename);
-        if (!String.IsNullOrEmpty(filename)) break;
+        Console.Write("Введите новое количество страниц: ");
+        string? s = Console.ReadLine();
+        int val;
+        if (!String.IsNullOrEmpty(s) && Int32.TryParse(s, out val))
+        {
+            numberOfPages = val;
+            break;
+            
+        }
 
         Console.WriteLine("Введенное значение не удовлетворяет условиям");
     }
     while (true);
+
+    do
+    {
+        Console.Write("Введите новый размер страницы: ");
+        string? s = Console.ReadLine();
+        int val;
+        if (!String.IsNullOrEmpty(s) && Int32.TryParse(s, out val))
+        {
+            sizeOfPage = val;
+            break;
+
+        }
+
+        Console.WriteLine("Введенное значение не удовлетворяет условиям");
+    }
+    while (true);
+
+    storage = new VmStorage<int>(filename,storageSize,numberOfPages, sizeOfPage);
 }
-
+else
+{
+storage = new VmStorage<int>();
+}
+Console.WriteLine("================================================================");
+Console.WriteLine("Файл открыт/создан");
 Console.WriteLine();
+
 Console.WriteLine("================================================================");
 Console.WriteLine("Используемые значения:");
-Console.WriteLine($"  - Размер массива = {storageSize}");
-Console.WriteLine($"  - Название файла = {filename}");
-Console.WriteLine();
+Console.WriteLine($"  - Размер хранилища = {storage.Size}");
+Console.WriteLine($"  - Название файла = {storage.Filename}");
+Console.WriteLine($"  - Количество страниц = {storage.GetNumberOfPages()}");
+Console.WriteLine($"  - Pазмер страницы = {storage.GetPageSize()}");
 
-
-
-var storage = new VmStorage<int>(filename, storageSize);
-Console.WriteLine("Файл открыт/создан");
-
-Console.WriteLine();
-Console.WriteLine();
 
 bool isExit = false;
 
@@ -71,7 +120,7 @@ try
                 throw new Exception();
             }
 
-            if (value >= 0 && value < storageSize)
+            if (value >= 0 && value < storage.Size)
             {
                 elementIndex = value.Value;
                 break;

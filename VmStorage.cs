@@ -3,39 +3,29 @@ namespace VirtualMem
 {
 	public class VmStorage<TElement>
 	{
-        private String filename;
-        private int size;
+        public String Filename { get; init; }
+        public int Size { get; init; }
 		private VmFile<TElement>? vmFile;
 		private bool isOpened = false;
-		private VmPage<TElement>[] inMemoryPages = new VmPage<TElement>[3];
+		private VmPage<TElement>[] inMemoryPages;
 
-        public VmStorage()
-		{			
-			Create(VmStorage.DefaultFilename, VmStorage.DefaultSize);
-		}
 
-		public VmStorage(String filename, int? size)
-		{			
-			Create(filename, size);
-		}
-
-		private void Create(String? filename, int? size)
+		public VmStorage(String filename = "pagefile.dat", int size = 15000, int numberOfPagesInMemory = 3, int pageSize = 512)
 		{
-			if (!string.IsNullOrEmpty(filename))
-			{
-				this.filename = filename ?? this.filename;
-			}
-			if (size != null)
-			{
-				this.size = size.Value;
-			}
-			vmFile = OpenOrCreateVmFile();
-			isOpened = true;
-		}
+			inMemoryPages = new VmPage<TElement>[numberOfPagesInMemory];
+			Filename = filename;
+			Size = size;
+            vmFile = OpenOrCreateVmFile(pageSize);
+            isOpened = true;
 
-		private VmFile<TElement> OpenOrCreateVmFile()
+        }
+
+		public int GetNumberOfPages() { return inMemoryPages.Length; }
+		public int GetPageSize() { return vmFile.PageSize; }
+
+		private VmFile<TElement> OpenOrCreateVmFile(int pageSize)
 		{
-            VmFile<TElement> vmf = new VmFile<TElement>(filename, size);
+            VmFile<TElement> vmf = new VmFile<TElement>(Filename, Size, pageSize);
             vmf.OpenOrCreate();
 			return vmf;
         }
@@ -72,7 +62,7 @@ namespace VirtualMem
 		{
 			CheckIfAlreadyClosed();
 
-            if (elementIndex + 1 > size || elementIndex < 0)
+            if (elementIndex + 1 > Size || elementIndex < 0)
 			{
                 throw new InvalidOperationException("ReadElement: Индекс вышел за пределы массива");
             }
@@ -82,19 +72,17 @@ namespace VirtualMem
 				throw new InvalidOperationException("ReadElement: VmFile не инициализирован");
             }
 
-			int elementPageIndex = GetPageIndexByElementIndex(elementIndex); // индекс искомой страницы
+			int elementPageIndex = GetPageIndexByElementIndex(elementIndex); 
 			int inPageElementIndex = (int)(elementIndex - elementPageIndex * vmFile.GetElementsOnPage());
 
             int choosenPageIndexToLoad;
 			bool pageNotFound = true;
-			int pageLocalIndex = -1; // индекс найденной страницы, которую надо использовать
+			int pageLocalIndex = -1; 
 
-			// ищем страницу с таким индексом - может быть, она уже загружена
 			for (int i = 0; i < inMemoryPages.Length; i++)
 			{				
 				if (inMemoryPages[i] != null && inMemoryPages[i].PageIndex == elementPageIndex)
 				{
-					// нашли страницу
 					pageNotFound = false;
 					pageLocalIndex = i;
 					break;
@@ -103,32 +91,28 @@ namespace VirtualMem
 
 			if (pageNotFound)
 			{
-                // искомая страница не найдена среди имеющихся уже в памяти
-                choosenPageIndexToLoad = FindNullPage(); // ищем пустой слот
+                choosenPageIndexToLoad = FindNullPage(); 
 
-                if (choosenPageIndexToLoad == -1) // значит пустого слота не было
+                if (choosenPageIndexToLoad == -1)
 				{
-                    choosenPageIndexToLoad = FindNotModifiedPage(); // ищем не модифицированную
+                    choosenPageIndexToLoad = FindNotModifiedPage();
 				}
 
-                if (choosenPageIndexToLoad == -1) // значит все страницы были модифицированы
+                if (choosenPageIndexToLoad == -1)
                 {
-					// ищем самую раннюю, которая раньше всех была загружена в память
+
                     choosenPageIndexToLoad = FindEarlierPage();
                 }
                 
 				if (inMemoryPages[choosenPageIndexToLoad] != null && inMemoryPages[choosenPageIndexToLoad].isModified == true)
 				{
-					// страница была модифицирована, следовательно сохраняем на диск перед замещением
 					vmFile.WritePage(inMemoryPages[choosenPageIndexToLoad]);
 				}
-                var page = vmFile.ReadPage(elementPageIndex); // загружаем с диска искомую страницу
-                inMemoryPages[choosenPageIndexToLoad] = page; // операция замещения (теряется страница, которая была ранее в этом индексе)
+                var page = vmFile.ReadPage(elementPageIndex); 
+                inMemoryPages[choosenPageIndexToLoad] = page;
 				pageLocalIndex = choosenPageIndexToLoad;
 			}
 
-			// искомая страница загружена в память
-			// индекс элемента на странице известен
 			
 			TElement element = inMemoryPages[pageLocalIndex].ReadElement(inPageElementIndex);
             return element;
@@ -173,12 +157,11 @@ namespace VirtualMem
 			return -1;
 		}
 
-
         public void WriteElement(long elementIndex, TElement element)
 		{
 			CheckIfAlreadyClosed();
 
-            if (elementIndex + 1 > size || elementIndex < 0)
+            if (elementIndex + 1 > Size || elementIndex < 0)
 			{
 				throw new InvalidOperationException("WriteElement: Индекс вышел за пределы массива");
 			}
@@ -191,8 +174,6 @@ namespace VirtualMem
 			int elementPageIndex = GetPageIndexByElementIndex(elementIndex);
 			int inPageElementIndex = (int)(elementIndex - elementPageIndex * vmFile.GetElementsOnPage());
 
-			// считываем элемент, чтобы гарантировать, что искомая страница
-			// оказалась в памяти
 			ReadElement(elementIndex);
 
             int pageLocalIndex = -1;
@@ -220,10 +201,4 @@ namespace VirtualMem
             return (int)Math.Floor((decimal)elementIndex / vmFile.GetElementsOnPage());
         }
     }
-}
-
-public static class VmStorage
-{
-    public const String DefaultFilename = "pagefile.dat";
-    public const int DefaultSize = 15000;
 }

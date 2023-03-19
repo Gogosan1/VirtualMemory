@@ -5,16 +5,17 @@ namespace VirtualMem
 	{
 		private readonly String Filename;
 		private readonly int NumberOfElements;
-		private const int PageSize = 512;
+		public int PageSize { get; init; }
 		private const String signatureValue = "VM";
 		private FileStream? vmFileStream;
 		private BinaryReader? vmFileReader;
 		private BinaryWriter? vmFileWriter;
 
-		public VmFile(String filename, int numberOfElements)
+		public VmFile(String filename, int numberOfElements, int PageSize = 512)
 		{
 			this.Filename = filename;
 			this.NumberOfElements = numberOfElements;
+			this.PageSize = PageSize;
 		}
 
 		public void OpenOrCreate()
@@ -126,7 +127,7 @@ namespace VirtualMem
 
 		private int GetPageLength()
 		{
-			return GetBitMapLength() + VmFile<TElement>.PageSize;
+			return GetBitMapLength() + PageSize;
 		}
 
 		private int GetBitMapLength()
@@ -166,17 +167,18 @@ namespace VirtualMem
 
 		private bool[] ReadBitmap(BinaryReader reader, int bitmapLength)
 		{
-			bool[] buf = new bool[bitmapLength * 8];
+			const int BYTE_SIZE = 8;
+			bool[] buf = new bool[bitmapLength * BYTE_SIZE];
 
 			try
 			{
 				for (int i = 0; i < bitmapLength; i++)
 				{
 					byte v = reader.ReadByte();
-					for (int p = 0; p < 8; p++)
+					for (int p = 0; p < BYTE_SIZE; p++)
 					{
 						byte bitmask = (byte)Math.Pow(2, p);
-						buf[i * 8 + p] = ((v & bitmask) == 0) ? false : true;
+						buf[i * BYTE_SIZE + p] = ((v & bitmask) == 0) ? false : true;
 					}
 				}
 			}
@@ -243,41 +245,20 @@ namespace VirtualMem
 
 		private void WriteBitmap(BinaryWriter writer, int bitmapLength, bool[]? bitmap)
 		{
+			const int BYTE_SIZE = 8;
 			byte[] buf = new byte[bitmapLength];
 
 			try
 			{
-                // bitmap[0] = true		-> значит в Elements[0] есть значение!
-                // bitmap[1] = true		-> значит в Elements[1] есть значение!
-                // bitmap[2] = false    -> значит в Elements[2] НЕТ значения
-                // bitmap[3] = true		-> значит в Elements[3] есть значение!
-                // bitmap[4] = false
-                // bitmap[5] = false
-                // bitmap[6] = true
-                // bitmap[7] = true
-                //
-                // 10000000 (bitmap[0]) = 2 ^0 = 1
-                // 01000000 (bitmap[1]) = 2 ˆ1 = 2
-                // 00010000 (bitmap[3]) = 2 ˆ3 = 8
-                // 00000010 (bitmap[6]) = 2 ˆ6 = 64
-                // 00000001 (bitmap[7]) = 2 ^7 = 128
-
-                // 11010011
-                // 1 + 2 + 0 + 8 + 0 + 0 + 64 + 128 = 11 + 64 + 128 = 203
-                // 203
-
+                
                 int pos = 0;
 				for (int i = 0; i < bitmapLength; i++)
 				{
 					byte v = 0;
-					// v = 1 -> 10000000
-					//          00000100
-					// =================
-					//          10010101
-
-					for (int p = 0; p < 8; p++)
+					
+					for (int p = 0; p < BYTE_SIZE; p++)
 					{
-						pos = i * 8 + p;
+						pos = i * BYTE_SIZE + p;
 						if (bitmap?[pos] == true)
 						{
 							v = (byte)(v | (byte)Math.Pow(2, p));
@@ -292,10 +273,6 @@ namespace VirtualMem
 				throw new InvalidOperationException("WriteBitmap: Ошибка при формировании битовой маски");
             }
 
-            // abc123qweMK
-            //    _       
-            // abc563qweMK
-            // 
             try
             {
 				writer.Write(buf);
